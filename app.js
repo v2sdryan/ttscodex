@@ -19,9 +19,14 @@ const elements = {
   messageInput: document.querySelector("#messageInput"),
   sendButton: document.querySelector("#sendButton"),
   clearChatButton: document.querySelector("#clearChatButton"),
+  micButton: document.querySelector("#micButton"),
+  micStatus: document.querySelector("#micStatus"),
 };
 
 let isSending = false;
+let isListening = false;
+let recognition = null;
+let activeAudio = null;
 let messages = [
   createMessage("model", WELCOME_MESSAGE),
 ];
@@ -68,6 +73,10 @@ function updateStatus(message, ready = false) {
     ? "rgba(158, 231, 218, 0.10)"
     : "rgba(255, 143, 99, 0.08)";
   elements.connectionStatus.style.color = ready ? "#9ee7da" : "#ff8f63";
+}
+
+function updateMicStatus(message) {
+  elements.micStatus.textContent = message;
 }
 
 function getSettingsFromForm() {
@@ -141,6 +150,7 @@ function setSendingState(sending) {
   isSending = sending;
   elements.sendButton.disabled = sending;
   elements.messageInput.disabled = sending;
+  elements.micButton.disabled = sending;
   elements.sendButton.textContent = sending ? "傳送中..." : "送出訊息";
 }
 
@@ -176,6 +186,7 @@ function revokeAudioUrls() {
 
 function resetChat() {
   revokeAudioUrls();
+  stopActiveAudio();
   messages = [createMessage("model", WELCOME_MESSAGE)];
   renderMessages();
 }
@@ -234,6 +245,35 @@ function pcmToWavBlob(pcmBytes, sampleRate = 24000, channels = 1, bitsPerSample 
   view.setUint32(40, pcmBytes.length, true);
 
   return new Blob([wavBuffer], { type: "audio/wav" });
+}
+
+function stopActiveAudio() {
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio.currentTime = 0;
+    activeAudio = null;
+  }
+}
+
+async function autoplayAudio(audioUrl) {
+  stopActiveAudio();
+  const audio = new Audio(audioUrl);
+  audio.preload = "auto";
+  activeAudio = audio;
+
+  audio.addEventListener("ended", () => {
+    if (activeAudio === audio) {
+      activeAudio = null;
+    }
+  });
+
+  audio.addEventListener("pause", () => {
+    if (audio.currentTime === 0 && activeAudio === audio) {
+      activeAudio = null;
+    }
+  });
+
+  await audio.play();
 }
 
 async function generateSpeechForMessage(messageId) {
@@ -309,15 +349,19 @@ async function generateSpeechForMessage(messageId) {
       audioError: "",
       audioUrl,
     });
+    await autoplayAudio(audioUrl);
     updateStatus(`已生成 TTS 語音: ${settings.voice}`, true);
   } catch (error) {
     const fallback =
       error instanceof Error ? error.message : "發生未知錯誤，請稍後再試。";
+    const isAutoplayError =
+      error instanceof Error &&
+      (error.name === "NotAllowedError" || error.name === "AbortError");
     updateMessage(messageId, {
       audioLoading: false,
-      audioError: `語音生成失敗：${fallback}`,
+      audioError: isAutoplayError ? "瀏覽器阻止自動播放，請按播放器播放。" : `語音生成失敗：${fallback}`,
     });
-    updateStatus("TTS 請求失敗", false);
+    updateStatus(isAutoplayError ? "語音已生成，但自動播放被瀏覽器阻止" : "TTS 請求失敗", !isAutoplayError);
   }
 }
 
@@ -338,6 +382,7 @@ async function sendMessage(text) {
   appendMessage("user", userText);
   elements.messageInput.value = "";
   setSendingState(true);
+  stopActiveAudio();
   updateStatus(`連線中: ${settings.model}`, true);
 
   try {
@@ -388,6 +433,104 @@ async function sendMessage(text) {
   }
 }
 
+function setListeningState(listening) {
+  isListening = listening;
+  elements.micButton.textContent = listening ? "停止收音" : "開始講嘢";
+  elements.micButton.classList.toggle("mic-active", listening);
+
+  if (!listening && !isSending) {
+    updateMicStatus("Enter 送出，Shift + Enter 換行");
+  }
+}
+
+function initialiseSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    elements.micButton.disabled = true;
+    updateMicStatus("呢個瀏覽器唔支援語音輸入");
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = "zh-HK";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  recognition.onstart = () => {
+    setListeningState(true);
+    updateMicStatus("收音中... 請直接講嘢");
+  };
+
+  recognition.onresult = (event) => {
+    let finalTranscript = "";
+    let interimTranscript = "";
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index][0]?.transcript || "";
+      if (event.results[index].isFinal) {
+        finalTranscript += transcript;
+      } else {
+        interimTranscript += transcript;
+      }
+    }
+
+    const currentText = finalTranscript || interimTranscript;
+    if (currentText) {
+      elements.messageInput.value = currentText.trim();
+    }
+
+    if (finalTranscript.trim()) {
+      setListeningState(false);
+      void sendMessage(finalTranscript.trim());
+    }
+  };
+
+  recognition.onerror = (event) => {
+    setListeningState(false);
+    if (event.error === "not-allowed") {
+      updateMicStatus("請先容許瀏覽器使用咪高峰");
+      return;
+    }
+
+    if (event.error === "no-speech") {
+      updateMicStatus("聽唔到聲，請再試一次");
+      return;
+    }
+
+    updateMicStatus(`語音輸入失敗: ${event.error}`);
+  };
+
+  recognition.onend = () => {
+    setListeningState(false);
+  };
+}
+
+function toggleListening() {
+  if (!recognition) {
+    updateMicStatus("呢個瀏覽器唔支援語音輸入");
+    return;
+  }
+
+  if (isSending) {
+    updateMicStatus("請等回覆完成先再開咪");
+    return;
+  }
+
+  if (isListening) {
+    recognition.stop();
+    setListeningState(false);
+    return;
+  }
+
+  stopActiveAudio();
+  elements.messageInput.value = "";
+  try {
+    recognition.start();
+  } catch {
+    updateMicStatus("暫時未能開啟收音，請再試一次");
+  }
+}
+
 function initialise() {
   const settings = loadSettings();
   elements.apiKeyInput.value = settings.apiKey;
@@ -398,7 +541,9 @@ function initialise() {
     settings.apiKey ? `已儲存: chat ${settings.model} / speech ${TTS_MODEL}` : "未設定 API key",
     Boolean(settings.apiKey),
   );
+  updateMicStatus("Enter 送出，Shift + Enter 換行");
   renderMessages();
+  initialiseSpeechRecognition();
 }
 
 elements.toggleKeyButton.addEventListener("click", () => {
@@ -430,6 +575,10 @@ elements.clearKeyButton.addEventListener("click", () => {
 elements.clearChatButton.addEventListener("click", () => {
   resetChat();
   updateStatus("對話已清空", Boolean(loadSettings().apiKey));
+});
+
+elements.micButton.addEventListener("click", () => {
+  toggleListening();
 });
 
 elements.chatForm.addEventListener("submit", async (event) => {

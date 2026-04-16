@@ -9,7 +9,9 @@ Each visitor enters their own Gemini API key in the browser. The key is stored o
 - Pure static frontend: `index.html`, `styles.css`, `app.js`
 - Hong Kong Cantonese system prompt using Traditional Chinese
 - User-supplied Gemini API key
+- Browser microphone input with `zh-HK` speech recognition when supported
 - Gemini 3.1 Flash TTS preview for generated speech playback
+- Automatic speech playback after each reply, with browser fallback controls if autoplay is blocked
 - Works well for GitHub + Vercel deployment
 - No server or environment variables required
 

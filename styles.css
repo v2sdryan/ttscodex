@@ -393,9 +393,20 @@ textarea {
   margin-top: 0;
 }
 
+.composer-button-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .hint-text {
   margin: 0;
   font-size: 13px;
+}
+
+.mic-active {
+  border-color: rgba(158, 231, 218, 0.42);
+  color: var(--cool);
 }
 
 @media (max-width: 980px) {
@@ -429,6 +440,11 @@ textarea {
   .composer-actions {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .composer-button-row {
+    width: 100%;
+    flex-direction: column;
   }
 
   .actions-row {
