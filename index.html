@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-HK">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Static Hong Kong Cantonese Gemini chatbot that runs directly in the browser."
+    />
+    <title>Cantonese Gemini Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="side-mark">
+        <div class="dot"></div>
+        <p class="vertical-label">Hong Kong Cantonese Chat</p>
+        <p class="small-index">04</p>
+      </aside>
+
+      <main class="app-shell">
+        <section class="hero-panel">
+          <div class="hero-copy">
+            <p class="eyebrow">Static HTML + Gemini</p>
+            <h1>廣東話聊天助手</h1>
+            <p class="hero-text">
+              呢個版本係純前端網站。用家自己輸入 Gemini API key，就可以直接喺瀏覽器用廣東話聊天。
+            </p>
+          </div>
+
+          <div class="info-card">
+            <p class="info-label">How it works</p>
+            <p class="info-text">
+              API key 只會儲存在使用者自己部機個瀏覽器，同 Gemini 直接連線，唔需要你另外開後端。
+            </p>
+          </div>
+        </section>
+
+        <section class="workspace">
+          <section class="settings-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Setup</p>
+                <h2>連線設定</h2>
+              </div>
+              <span id="connectionStatus" class="status-pill">未設定 API key</span>
+            </div>
+
+            <div class="settings-grid">
+              <label class="field">
+                <span>Gemini API key</span>
+                <div class="inline-field">
+                  <input
+                    id="apiKeyInput"
+                    type="password"
+                    autocomplete="off"
+                    placeholder="貼上你自己嘅 Gemini API key"
+                  />
+                  <button id="toggleKeyButton" type="button" class="ghost-button compact-button">
+                    顯示
+                  </button>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Chat model</span>
+                <select id="modelSelect">
+                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Speech model</span>
+                <input
+                  id="ttsModelInput"
+                  type="text"
+                  value="gemini-3.1-flash-tts-preview"
+                  readonly
+                />
+              </label>
+
+              <label class="field">
+                <span>TTS voice</span>
+                <select id="voiceSelect">
+                  <option value="Achird">Achird - Friendly</option>
+                  <option value="Kore">Kore - Firm</option>
+                  <option value="Zephyr">Zephyr - Bright</option>
+                  <option value="Sulafat">Sulafat - Warm</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="actions-row">
+              <button id="saveKeyButton" type="button" class="primary-button">儲存設定</button>
+              <button id="clearKeyButton" type="button" class="ghost-button">清除 API key</button>
+              <a
+                class="text-link"
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+              >
+                取得 Gemini API key
+              </a>
+            </div>
+
+            <p class="notice-text">
+              如果部機係共用，唔好勾留 API key。語音固定使用 Gemini 3.1 Flash TTS Preview 生成。
+            </p>
+            <p class="notice-text">
+              Google 官方文件寫明 TTS model 係 text-only input、audio-only output，所以文字對話仍然需要另一個 chat model。香港廣東話語音仍然屬於 best-effort。
+            </p>
+          </section>
+
+          <section class="chat-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Chat</p>
+                <h2>即時對話</h2>
+              </div>
+              <div class="chat-tools">
+                <button id="clearChatButton" type="button" class="ghost-button">清空對話</button>
+              </div>
+            </div>
+
+            <div id="messageList" class="message-list" aria-live="polite"></div>
+
+            <form id="chatForm" class="composer">
+              <label class="field composer-field" for="messageInput">
+                <span>輸入訊息</span>
+                <textarea
+                  id="messageInput"
+                  rows="4"
+                  placeholder="例如：同我用香港廣東話講下今日心情。"
+                ></textarea>
+              </label>
+
+              <div class="actions-row composer-actions">
+                <p class="hint-text">Enter 送出，Shift + Enter 換行</p>
+                <button id="sendButton" type="submit" class="primary-button">送出訊息</button>
+              </div>
+            </form>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
